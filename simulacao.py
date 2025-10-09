@@ -176,7 +176,6 @@ if 'params' not in st.session_state:
 # Interface Streamlit
 # -----------------------------
 st.title("🦠 Modelo SIR Não Autônomo")
-st.markdown("**Simulação com γ(t) e q(t) periódicas no tempo**")
 
 # -----------------------------
 # Barra lateral
@@ -270,9 +269,9 @@ with st.spinner("Simulando modelo não autônomo com scipy.integrate.solve_ivp..
 # -----------------------------
 # Análise de estabilidade
 # -----------------------------
-st.header("📊 Análise de Estabilidade")
+st.header("📊 Dados")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("m(γ)", analysis["m_gamma"], 
               help="Média de γ(t)")
@@ -284,12 +283,6 @@ with col3:
     st.metric("Diferença", f"{delta:.4f}",
               delta=delta,
               help="m(γ) - (a+b+c)")
-with col4:
-    st.metric("γ_mín", analysis["gamma_min"],
-              help="Valor mínimo de γ(t)")
-with col5:
-    st.metric("γ_máx", analysis["gamma_max"],
-              help="Valor máximo de γ(t)")
 
 # Box com resultado do teorema
 if analysis["is_stable"]:
@@ -531,4 +524,5 @@ with st.expander("📊 Ver Tabela de Dados"):
         file_name=f"sir_nonautonomous_mgamma_{analysis['m_gamma']}.csv",
         mime="text/csv"
     )
+
 
