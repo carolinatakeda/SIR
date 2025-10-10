@@ -29,8 +29,8 @@ def analyze_mean(gamma0, gammaAmp, a, b, c):
         "gamma_min": round(gamma_min, 4),
         "gamma_max": round(gamma_max, 4),
         "threshold": round(threshold, 4),
-        "is_stable": condition_survive,  # CORRIGIDO: Adicionada chave faltante
-        "condition": "m(γ) < a + b + c" if condition_survive else "m(γ) ≥ a + b + c"
+        "condition": condition_survive,
+        "condition_return": "m(γ) < a + b + c" if condition_survive else "m(γ) ≥ a + b + c"
     }
 
 def sir_system(t, y, gamma_func, q_func, a, b, c):
@@ -50,8 +50,10 @@ def sir_system(t, y, gamma_func, q_func, a, b, c):
     return np.array([dS, dI, dR])
 
 def N_star(t, q0, qAmp, a):
+    """Calcula N*(t) - atrator pullback"""
+    if a == 0:
+        return q0 * t
     return q0 / a + qAmp * (a * np.sin(t) - np.cos(t)) / (a**2 + 1)
-
 
 def run_simulation(a, b, c, gamma0, gammaAmp, q0, qAmp, S0, I0, R0, tMax):
     # Funções gamma(t) e q(t) periódicas
@@ -101,7 +103,7 @@ def run_simulation(a, b, c, gamma0, gammaAmp, q0, qAmp, S0, I0, R0, tMax):
     
     return pd.DataFrame(results)
 
-def create_style_plot(data, color_S, color_I, color_R, title=""):
+def create_style_plot(data, color_S, color_I, color_R, title="", show_attractor=False):
     fig = plt.figure(figsize=(14, 10))
     gs = gridspec.GridSpec(3, 2, width_ratios=[1, 1.5], hspace=0.3, wspace=0.3)
     
@@ -133,11 +135,21 @@ def create_style_plot(data, color_S, color_I, color_R, title=""):
     # Colormap baseado no tempo
     colors = plt.cm.viridis(np.linspace(0, 1, len(data)))
     
+    # Trajetória do sistema
     for i in range(len(data) - 1):
         ax4.plot(data['S'].iloc[i:i+2], 
                 data['I'].iloc[i:i+2], 
                 data['R'].iloc[i:i+2],
                 color=colors[i], linewidth=2, alpha=0.7)
+    
+    # Se a condição for verdadeira, mostrar o atrator N*(t) no eixo S
+    if show_attractor:
+        # Trajetória do atrator: (N*(t), 0, 0)
+        ax4.plot(data['N_star'], 
+                np.zeros(len(data)), 
+                np.zeros(len(data)),
+                color='red', linewidth=3, linestyle='--', 
+                alpha=0.8, label='Atrator: (N*, 0, 0)', zorder=3)
     
     # Ponto inicial
     ax4.scatter([data['S'].iloc[0]], [data['I'].iloc[0]], [data['R'].iloc[0]],
@@ -285,9 +297,9 @@ with col3:
               help="m(γ) - (a+b+c)")
 
 # Box com resultado do teorema
-if analysis["is_stable"]:
+if analysis["condition"]:
     st.success(f"""
-    **✅ Condição: {analysis['condition']}**
+    **✅ Condição: {analysis['condition_return']}**
     
     **Teorema (Caso 1):** A doença é erradicada!
     
@@ -298,7 +310,7 @@ if analysis["is_stable"]:
     """)
 else:
     st.error(f"""
-    **⚠️ Condição: {analysis['condition']}**
+    **⚠️ Condição: {analysis['condition_return']}**
     
     **Teorema (Caso 2):** A doença persiste endemicamente!
     
@@ -323,7 +335,7 @@ with st.expander("📐 Ver Sistema de Equações Não Autônomo"):
         st.latex(r"\gamma(t) = \gamma_0 + A_\gamma \sin(t)")
         st.caption("Taxa de infecção")
     with col2:
-        st.latex(r"q(t) = q_0 + A_q \sin(t)")  # CORRIGIDO: parêntese adicionado
+        st.latex(r"q(t) = q_0 + A_q \sin(t)")
         st.caption("Nascimentos/imigrações")
     
     st.markdown("---")
@@ -355,17 +367,33 @@ with st.expander("📐 Ver Sistema de Equações Não Autônomo"):
 st.header("📈 Dinâmica SIR")
 
 fig = create_style_plot(data, color_S, color_I, color_R, 
-                       "Simulação SIR Não Autônomo")
+                       "Simulação SIR Não Autônomo",
+                       show_attractor=analysis["condition"])
 st.pyplot(fig)
 
-st.info("""
-**Interpretação do gráfico:**
-- **Painéis esquerdos:** Evolução temporal de S(t), I(t) e R(t)
-- **Painel direito:** Diagrama de fase 3D mostrando trajetória no espaço (S, I, R)
-- **Ponto verde:** Condição inicial (S₀, I₀, R₀)
-- **Ponto vermelho:** Estado final após t_max dias
-- **Gradiente de cores:** Progressão temporal (roxo → amarelo)
-""")
+if analysis["condition"]:
+    st.info("""
+    **Interpretação do gráfico:**
+    - **Painéis esquerdos:** Evolução temporal de S(t), I(t) e R(t)
+    - **Painel direito:** Diagrama de fase 3D mostrando trajetória no espaço (S, I, R)
+    - **Ponto verde:** Condição inicial (S₀, I₀, R₀)
+    - **Ponto vermelho:** Estado final após t_max dias
+    - **Linha vermelha tracejada:** Atrator pullback (N*(t), 0, 0) - estado livre de doença
+    - **Gradiente de cores:** Progressão temporal (roxo → amarelo)
+    
+    Note como a trajetória converge para o atrator no plano I=0, R=0.
+    """)
+else:
+    st.info("""
+    **Interpretação do gráfico:**
+    - **Painéis esquerdos:** Evolução temporal de S(t), I(t) e R(t)
+    - **Painel direito:** Diagrama de fase 3D mostrando trajetória no espaço (S, I, R)
+    - **Ponto verde:** Condição inicial (S₀, I₀, R₀)
+    - **Ponto vermelho:** Estado final após t_max dias
+    - **Gradiente de cores:** Progressão temporal (roxo → amarelo)
+    
+    No regime endêmico, a trajetória não converge para um estado livre de doença.
+    """)
 
 # -----------------------------
 # Gráficos das funções temporais
@@ -418,17 +446,25 @@ with col2:
 st.header("👥 Dinâmica Populacional Total")
 
 t = data['t']
-N_star_values = N_star(t, q0, qAmp, a)
-
+N_star_values = data['N_star']
 
 fig3, ax3 = plt.subplots(figsize=(12, 5))
 ax3.plot(t, data['N'], label='N(t) — População Total', 
-         color='darkblue', linewidth=2.5, alpha = 0.8 )
-ax3.plot(t, N_star_values,  
-         label='N*(t) — Atrator (aprox)', color='red', linewidth=2, alpha = 0.6)
+         color='darkblue', linewidth=2.5, alpha=0.8)
+
+# Mostrar N*(t) apenas se a doença for erradicada
+if analysis["condition"]:
+    ax3.plot(t, N_star_values,  
+             label='N*(t) — Atrator Pullback', color='red', linewidth=2, alpha=0.6, linestyle='--')
+
 ax3.set_xlabel('Tempo (dias)', fontsize=11, fontweight='bold')
 ax3.set_ylabel('População', fontsize=11, fontweight='bold')
-ax3.set_title('População Total N(t) vs Atrator N*(t)', fontsize=13, fontweight='bold')
+
+if analysis["condition"]:
+    ax3.set_title('População Total N(t) vs Atrator N*(t)', fontsize=13, fontweight='bold')
+else:
+    ax3.set_title('População Total N(t) — Regime Endêmico', fontsize=13, fontweight='bold')
+
 ax3.legend(fontsize=11)
 ax3.grid(True, alpha=0.3)
 plt.tight_layout()
@@ -446,15 +482,23 @@ with col2:
 with col3:
     st.metric("Variação", f"{N_variation:.2f}%")
 
-st.info(f"""
-**N*(t)** representa o atrator pullback (equilíbrio populacional livre de doença) quando m(γ) < a+b+c.
-
-Fórmula exata para q(t) = q₀ + A_q sin(t):
-
-N*(t) = q₀/a + A_q(a·sin(t) - cos(t))/(a² + 1)
-
-A população N(t) converge para este valor oscilatório quando a doença é erradicada.
-""")
+# Mensagem explicativa diferente dependendo da condição
+if analysis["condition"]:
+    st.info("""
+    **N*(t)** representa o atrator pullback (equilíbrio populacional livre de doença) quando m(γ) < a+b+c.
+    
+    Fórmula exata para q(t) = q₀ + A_q sin(t):
+    
+    N*(t) = q₀/a + A_q(a·sin(t) - cos(t))/(a² + 1)
+    
+    A população N(t) converge para este valor oscilatório quando a doença é erradicada.
+    """)
+else:
+    st.warning("""
+    **Regime Endêmico:** Como m(γ) ≥ a+b+c, a doença persiste na população e não há convergência 
+    para o atrator pullback livre de doença. A população total N(t) mantém um equilíbrio dinâmico 
+    com presença contínua de infectados.
+    """)
 
 # -----------------------------
 # Análise detalhada de I(t)
@@ -504,12 +548,13 @@ with col4:
 # -----------------------------
 with st.expander("📊 Ver Tabela de Dados"):
     st.dataframe(
-        data[['t', 'S', 'I', 'R', 'N', 'gamma', 'q']].style.format({
+        data[['t', 'S', 'I', 'R', 'N', 'N_star', 'gamma', 'q']].style.format({
             't': '{:.1f}',
             'S': '{:.2f}',
             'I': '{:.4f}',
             'R': '{:.2f}',
             'N': '{:.2f}',
+            'N_star': '{:.2f}',
             'gamma': '{:.4f}',
             'q': '{:.2f}'
         }),
@@ -524,5 +569,4 @@ with st.expander("📊 Ver Tabela de Dados"):
         file_name=f"sir_nonautonomous_mgamma_{analysis['m_gamma']}.csv",
         mime="text/csv"
     )
-
 
