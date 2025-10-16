@@ -490,14 +490,12 @@ if analysis["condition"]:
     Fórmula exata para q(t) = q₀ + A_q sin(t):
     
     N*(t) = q₀/a + A_q(a·sin(t) - cos(t))/(a² + 1)
-    
-    A população N(t) converge para este valor oscilatório quando a doença é erradicada.
+
     """)
 else:
     st.warning("""
     **Regime Endêmico:** Como m(γ) ≥ a+b+c, a doença persiste na população e não há convergência 
-    para o atrator pullback livre de doença. A população total N(t) mantém um equilíbrio dinâmico 
-    com presença contínua de infectados.
+    para o atrator pullback livre de doença. 
     """)
 
 # -----------------------------
@@ -569,4 +567,5 @@ with st.expander("📊 Ver Tabela de Dados"):
         file_name=f"sir_nonautonomous_mgamma_{analysis['m_gamma']}.csv",
         mime="text/csv"
     )
+
 
