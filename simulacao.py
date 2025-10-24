@@ -257,12 +257,12 @@ with st.sidebar:
     
     with st.expander("⏱️ Simulação", expanded=True):
         s = st.number_input("s — instante inicial", 
-                           min_value=0.0, 
+                           min_value=-1000.0, 
                            max_value=1000.0,
                            value=float(st.session_state.params['s']),
                            step=1.0,
                            help="Tempo em que a simulação começa")
-        tMax = st.slider("Tempo máximo (dias)", 50, 1000, 
+        tMax = st.slider("Tempo máximo (dias)", 50, 100000, 
                         st.session_state.params['tMax'], 50)
     
     with st.expander("🎨 Opções Gráficas"):
@@ -576,3 +576,4 @@ with st.expander("📊 Ver Tabela de Dados"):
         file_name=f"sir_nonautonomous_mgamma_{analysis['m_gamma']}.csv",
         mime="text/csv"
     )
+
