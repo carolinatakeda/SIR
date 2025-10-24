@@ -55,7 +55,7 @@ def N_star(t, q0, qAmp, a):
         return q0 * t
     return q0 / a + qAmp * (a * np.sin(t) - np.cos(t)) / (a**2 + 1)
 
-def run_simulation(a, b, c, gamma0, gammaAmp, q0, qAmp, S0, I0, R0, tMax):
+def run_simulation(a, b, c, gamma0, gammaAmp, q0, qAmp, S0, I0, R0, s, tMax):
     # Funções gamma(t) e q(t) periódicas
     def gamma_t(t):
         return gamma0 + gammaAmp * np.sin(t)
@@ -63,15 +63,18 @@ def run_simulation(a, b, c, gamma0, gammaAmp, q0, qAmp, S0, I0, R0, tMax):
     def q_t(t):
         return q0 + qAmp * np.sin(t)
     
+    def funcao_para_solve_ivp(t, y):
+        return sir_system(t, y, gamma_t, q_t, a, b, c)
+    
     # Condições iniciais
     y0 = np.array([S0, I0, R0], dtype=float)
     
-    # Pontos de tempo para avaliar a solução
-    t_eval = np.linspace(0, tMax, int(tMax * 10) + 1)
+    # Pontos de tempo para avaliar a solução (de s até s+tMax)
+    t_eval = np.linspace(s, s + tMax, int(tMax * 10) + 1)
     
     sol = solve_ivp(
-        fun=lambda t, y: sir_system(t, y, gamma_t, q_t, a, b, c),
-        t_span=(0, tMax),
+        fun=funcao_para_solve_ivp, 
+        t_span=(s, s + tMax),
         y0=y0,
         method='RK45', 
         t_eval=t_eval,
@@ -181,7 +184,7 @@ if 'params' not in st.session_state:
     st.session_state.params = {
         'gamma0': 0.3, 'gammaAmp': 0.1, 'c': 0.1,
         'a': 0.02, 'b': 0.05, 'q0': 20.0, 'qAmp': 5.0,
-        'S0': 900, 'I0': 50, 'R0': 50, 'tMax': 300
+        'S0': 900, 'I0': 50, 'R0': 50, 's': 0, 'tMax': 300
     }
 
 # -----------------------------
@@ -203,14 +206,14 @@ with st.sidebar:
             st.session_state.params = {
                 'gamma0': 0.06, 'gammaAmp': 0.05, 'c': 0.1,
                 'a': 0.02, 'b': 0.05, 'q0': 20.0, 'qAmp': 5.0,
-                'S0': 900, 'I0': 50, 'R0': 50, 'tMax': 500
+                'S0': 900, 'I0': 50, 'R0': 50, 's': 0, 'tMax': 500
             }
     with col2:
         if st.button("🔴 Doença\nEndêmica", use_container_width=True):
             st.session_state.params = {
                 'gamma0': 0.86, 'gammaAmp': 0.2, 'c': 0.1,
                 'a': 0.02, 'b': 0.05, 'q0': 20.0, 'qAmp': 5.0,
-                'S0': 900, 'I0': 50, 'R0': 50, 'tMax': 500
+                'S0': 900, 'I0': 50, 'R0': 50, 's': 0, 'tMax': 500
             }
     
     st.divider()
@@ -253,6 +256,12 @@ with st.sidebar:
         st.caption(f"População inicial N₀ = {S0 + I0 + R0}")
     
     with st.expander("⏱️ Simulação", expanded=True):
+        s = st.number_input("s — instante inicial", 
+                           min_value=0.0, 
+                           max_value=1000.0,
+                           value=float(st.session_state.params['s']),
+                           step=1.0,
+                           help="Tempo em que a simulação começa")
         tMax = st.slider("Tempo máximo (dias)", 50, 1000, 
                         st.session_state.params['tMax'], 50)
     
@@ -266,7 +275,7 @@ with st.sidebar:
 # -----------------------------
 with st.spinner("Simulando modelo não autônomo com scipy.integrate.solve_ivp..."):
     try:
-        data = run_simulation(a, b, c, gamma0, gammaAmp, q0, qAmp, S0, I0, R0, tMax)
+        data = run_simulation(a, b, c, gamma0, gammaAmp, q0, qAmp, S0, I0, R0, s, tMax)
         
         if data.empty:
             st.error("Erro na simulação. Verifique os parâmetros.")
@@ -279,7 +288,7 @@ with st.spinner("Simulando modelo não autônomo com scipy.integrate.solve_ivp..
         st.stop()
 
 # -----------------------------
-# Análise de estabilidade
+# Análise dos dados
 # -----------------------------
 st.header("📊 Dados")
 
@@ -567,5 +576,3 @@ with st.expander("📊 Ver Tabela de Dados"):
         file_name=f"sir_nonautonomous_mgamma_{analysis['m_gamma']}.csv",
         mime="text/csv"
     )
-
-
