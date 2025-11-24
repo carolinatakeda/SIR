@@ -297,8 +297,7 @@ with col1:
     st.metric("m(γ)", analysis["m_gamma"], 
               help="Média de γ(t)")
 with col2:
-    st.metric("a + b + c", analysis["threshold"],
-              help="Limiar de estabilidade")
+    st.metric("a + b + c", analysis["threshold"])
 with col3:
     delta = analysis["m_gamma"] - analysis["threshold"]
     st.metric("Diferença", f"{delta:.4f}",
@@ -576,4 +575,5 @@ with st.expander("📊 Ver Tabela de Dados"):
         file_name=f"sir_nonautonomous_mgamma_{analysis['m_gamma']}.csv",
         mime="text/csv"
     )
+
 
