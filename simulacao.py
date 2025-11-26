@@ -22,15 +22,26 @@ def analyze_mean(gamma0, gammaAmp, a, b, c):
     gamma_min = gamma0 - gammaAmp
     gamma_max = gamma0 + gammaAmp
     threshold = a + b + c
-    condition_survive = m_gamma < threshold
+
+    eps = 1e-8  # tolerância numérica
+
+    if m_gamma < threshold - eps:
+        condition = True
+        condition_return = "m(γ) < a + b + c"
+    elif abs(m_gamma - threshold) <= eps:
+        condition = None
+        condition_return = "m(γ) = a + b + c"
+    else:
+        condition = False
+        condition_return = "m(γ) > a + b + c"
     
     return {
-        "m_gamma": round(m_gamma, 4),
-        "gamma_min": round(gamma_min, 4),
-        "gamma_max": round(gamma_max, 4),
-        "threshold": round(threshold, 4),
-        "condition": condition_survive,
-        "condition_return": "m(γ) < a + b + c" if condition_survive else "m(γ) ≥ a + b + c"
+        "m_gamma": round(m_gamma, 6),
+        "gamma_min": round(gamma_min, 6),
+        "gamma_max": round(gamma_max, 6),
+        "threshold": round(threshold, 6),
+        "condition": condition,
+        "condition_return": condition_return
     }
 
 def sir_system(t, y, gamma_func, q_func, a, b, c):
@@ -200,7 +211,7 @@ with st.sidebar:
     
     # Presets no topo
     st.subheader("📋 Cenários Pré-configurados")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("🟢 Doença\nExtinta", use_container_width=True):
             st.session_state.params = {
@@ -215,6 +226,13 @@ with st.sidebar:
                 'a': 0.02, 'b': 0.05, 'q0': 20.0, 'qAmp': 5.0,
                 'S0': 900, 'I0': 50, 'R0': 50, 's': 0, 'tMax': 500
             }
+    with col3: 
+        if st.button("🟡 Caso crítico",use_container_width=True): 
+             st.session_state.params = {
+                'gamma0': 0.3, 'gammaAmp': 0.2, 'c': 0.23,
+                'a': 0.02, 'b': 0.05, 'q0': 20.0, 'qAmp': 5.0,
+                'S0': 900, 'I0': 50, 'R0': 50, 's': 0, 'tMax': 500
+            }       
     
     st.divider()
     
@@ -305,7 +323,7 @@ with col3:
               help="m(γ) - (a+b+c)")
 
 # Box com resultado do teorema
-if analysis["condition"]:
+if analysis["condition"] is True:
     st.success(f"""
     **✅ Condição: {analysis['condition_return']}**
     
@@ -316,7 +334,7 @@ if analysis["condition"]:
     - O atrator pullback é 𝒜(t) = {{(N*(t), 0, 0)}}
     - Sistema converge para estado livre de doença
     """)
-else:
+elif analysis["condition"] is False:
     st.error(f"""
     **⚠️ Condição: {analysis['condition_return']}**
     
@@ -326,6 +344,9 @@ else:
     - Os infectados não tendem a zero
     - População mantém nível endêmico de infecção
     """)
+else: 
+    st.warning(f"""
+    **⚖️ Caso Crítico: {analysis['condition_return']}**""")
 
 # Sistema de equações
 with st.expander("📐 Ver Sistema de Equações Não Autônomo"):
@@ -363,7 +384,7 @@ with st.expander("📐 Ver Sistema de Equações Não Autônomo"):
     """)
     st.caption("Para γ(t) periódica: m(γ) = γ₀")
     
-    st.markdown("**Atrator pullback (caso estável):**")
+    st.markdown("**Atrator pullback:**")
     st.latex(r"N^*(t) = \int_{-\infty}^t e^{-a(t-r)} q(r) \, dr")
     st.markdown("Para $q(t) = q_0 + A_q\\sin(t)$, a solução exata é:")
     st.latex(r"N^*(t) = \frac{q_0}{a} + \frac{A_q(a\sin(t) - \cos(t))}{a^2 + 1}")
@@ -374,12 +395,14 @@ with st.expander("📐 Ver Sistema de Equações Não Autônomo"):
 # -----------------------------
 st.header("📈 Dinâmica SIR")
 
-fig = create_style_plot(data, color_S, color_I, color_R, 
-                       "Simulação SIR Não Autônomo",
-                       show_attractor=analysis["condition"])
+fig = create_style_plot(
+    data, color_S, color_I, color_R, 
+    "Simulação SIR Não Autônomo",
+    show_attractor=(analysis["condition"] is True)
+)
 st.pyplot(fig)
 
-if analysis["condition"]:
+if analysis["condition"] is True:
     st.info("""
     **Interpretação do gráfico:**
     - **Painéis esquerdos:** Evolução temporal de S(t), I(t) e R(t)
@@ -390,6 +413,15 @@ if analysis["condition"]:
     - **Gradiente de cores:** Progressão temporal (roxo → amarelo)
     
     Note como a trajetória converge para o atrator no plano I=0, R=0.
+    """)
+elif analysis["condition"] is None: 
+    st.info("""
+    **Interpretação do gráfico:**
+    - **Painéis esquerdos:** Evolução temporal de S(t), I(t) e R(t)
+    - **Painel direito:** Diagrama de fase 3D mostrando trajetória no espaço (S, I, R)
+    - **Ponto verde:** Condição inicial (S₀, I₀, R₀)
+    - **Ponto vermelho:** Estado final após t_max dias
+    - **Gradiente de cores:** Progressão temporal (roxo → amarelo)
     """)
 else:
     st.info("""
@@ -461,17 +493,20 @@ ax3.plot(t, data['N'], label='N(t) — População Total',
          color='darkblue', linewidth=2.5, alpha=0.8)
 
 # Mostrar N*(t) apenas se a doença for erradicada
-if analysis["condition"]:
+if analysis["condition"] is True:
     ax3.plot(t, N_star_values,  
              label='N*(t) — Atrator Pullback', color='red', linewidth=2, alpha=0.6, linestyle='--')
 
 ax3.set_xlabel('Tempo (dias)', fontsize=11, fontweight='bold')
 ax3.set_ylabel('População', fontsize=11, fontweight='bold')
 
-if analysis["condition"]:
-    ax3.set_title('População Total N(t) vs Atrator N*(t)', fontsize=13, fontweight='bold')
+if analysis["condition"] is True:
+    ax3.set_title('População Total N(t) vs  N*(t)', fontsize=13, fontweight='bold')
+elif analysis["condition"] is None:
+    ax3.set_title('População Total N(t) — Caso Crítico', fontsize=13, fontweight='bold')
 else:
     ax3.set_title('População Total N(t) — Regime Endêmico', fontsize=13, fontweight='bold')
+
 
 ax3.legend(fontsize=11)
 ax3.grid(True, alpha=0.3)
@@ -491,20 +526,29 @@ with col3:
     st.metric("Variação", f"{N_variation:.2f}%")
 
 # Mensagem explicativa diferente dependendo da condição
-if analysis["condition"]:
+if analysis["condition"] is True:
     st.info("""
-    **N*(t)** representa o atrator pullback (equilíbrio populacional livre de doença) quando m(γ) < a+b+c.
+    **N*(t)** representa a população total quando o atrator pullback é 𝒜(t) = {{(N*(t), 0, 0)}} e m(γ) <a+b+c
     
     Fórmula exata para q(t) = q₀ + A_q sin(t):
     
     N*(t) = q₀/a + A_q(a·sin(t) - cos(t))/(a² + 1)
 
     """)
+elif analysis["condition"] is None:
+    st.info("""
+    **Caso crítico:** o sistema está exatamente no limiar entre erradicação e persistência.
+    
+    O atrator livre de doença deixa de ser globalmente atrativo.
+    Pequenas perturbações nos parâmetros mudam completamente o regime.
+    """)
+
 else:
     st.warning("""
-    **Regime Endêmico:** Como m(γ) ≥ a+b+c, a doença persiste na população e não há convergência 
+    **Regime Endêmico:** Como m(γ) > a+b+c, a doença persiste na população e não há convergência 
     para o atrator pullback livre de doença. 
     """)
+
 
 # -----------------------------
 # Análise detalhada de I(t)
@@ -575,5 +619,4 @@ with st.expander("📊 Ver Tabela de Dados"):
         file_name=f"sir_nonautonomous_mgamma_{analysis['m_gamma']}.csv",
         mime="text/csv"
     )
-
 
